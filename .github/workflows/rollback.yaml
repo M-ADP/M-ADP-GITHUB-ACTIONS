@@ -59,7 +59,7 @@ jobs:
 
       - name: Update Helm values for rollback
         run: |
-          VALUES_PATH="values-repo/argocd/apps/values/${{ inputs.target_env }}/${{ steps.vars.outputs.app_name }}.yaml"
+          VALUES_PATH="values-repo/apps/values/${{ inputs.target_env }}/${{ steps.vars.outputs.app_name }}.yaml"
 
           if [[ ! -f "$VALUES_PATH" ]]; then
             echo "❌ ERROR: $VALUES_PATH does not exist for rollback"

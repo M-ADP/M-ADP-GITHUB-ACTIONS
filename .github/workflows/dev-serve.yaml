@@ -82,7 +82,7 @@ jobs:
 
       - name: Update Helm values
         run: |
-          VALUES_PATH="values-repo/argocd/apps/values/dev-serve/${{ steps.vars.outputs.app_name }}.yaml"
+          VALUES_PATH="values-repo/apps/values/dev-serve/${{ steps.vars.outputs.app_name }}.yaml"
 
           if [[ ! -f "$VALUES_PATH" ]]; then
             echo "❌ ERROR: $VALUES_PATH does not exist"
