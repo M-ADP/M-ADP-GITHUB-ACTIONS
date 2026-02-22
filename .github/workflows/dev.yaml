@@ -59,8 +59,8 @@ jobs:
         run: |
           BRANCH="${{ steps.pr.outputs.branch }}"
 
-          if [[ ! "$BRANCH" =~ ^dev-.*$ ]]; then
-            echo "Not a dev-* branch. Skipping deploy."
+          if [[ "$BRANCH" != "dev" ]]; then
+            echo "Not a 'dev' branch. Skipping deploy."
             exit 0
           fi
 
