@@ -7,8 +7,8 @@ on:
         description: "Environment to rollback (e.g., dev or dev-serve)"
         required: true
         type: string
-      target_image_tag:
-        description: "The Docker image tag to rollback to (e.g. 7-character commit SHA)"
+      target_version:
+        description: "The specific version to rollback to (e.g. v1.2.3, dev, hotfix-1)"
         required: true
         type: string
       deploy_repo:
@@ -32,8 +32,8 @@ jobs:
             exit 1
           fi
 
-          if [[ -z "${{ inputs.target_image_tag }}" ]]; then
-            echo "❌ Target image tag cannot be empty"
+          if [[ -z "${{ inputs.target_version }}" ]]; then
+            echo "❌ Target version cannot be empty"
             exit 1
           fi
 
@@ -66,7 +66,7 @@ jobs:
             exit 1
           fi
 
-          yq eval -i ".image.tag = \"${{ inputs.target_image_tag }}\"" $VALUES_PATH
+          yq eval -i ".image.tag = \"${{ inputs.target_version }}\"" $VALUES_PATH
 
           echo "Rollback Updated:"
           cat $VALUES_PATH
@@ -85,5 +85,5 @@ jobs:
           fi
 
           git add .
-          git commit -m "rollback(${{ inputs.target_env }}): revert image ${{ steps.vars.outputs.app_name }} to ${{ inputs.target_image_tag }}"
+          git commit -m "rollback(${{ inputs.target_env }}): revert image ${{ steps.vars.outputs.app_name }} to ${{ inputs.target_version }}"
           git push origin master
