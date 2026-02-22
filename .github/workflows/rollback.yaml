@@ -1,0 +1,89 @@
+name: Reusable Rollback Workflow
+
+on:
+  workflow_call:
+    inputs:
+      target_env:
+        description: "Environment to rollback (e.g., dev or dev-serve)"
+        required: true
+        type: string
+      target_image_tag:
+        description: "The Docker image tag to rollback to (e.g. 7-character commit SHA)"
+        required: true
+        type: string
+      deploy_repo:
+        description: "The GitOps values repository (e.g. M-ADP/M-ADP-ARGOCD)"
+        required: true
+        type: string
+    secrets:
+      PERSONAL_TOKEN: { required: true }
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Validate Inputs
+        run: |
+          if [[ "${{ inputs.target_env }}" != "dev" && "${{ inputs.target_env }}" != "dev-serve" ]]; then
+            echo "❌ Invalid target_env: ${{ inputs.target_env }}. Must be 'dev' or 'dev-serve'"
+            exit 1
+          fi
+
+          if [[ -z "${{ inputs.target_image_tag }}" ]]; then
+            echo "❌ Target image tag cannot be empty"
+            exit 1
+          fi
+
+      - name: Checkout values repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.deploy_repo }}
+          token: ${{ secrets.PERSONAL_TOKEN }}
+          path: values-repo
+          ref: master
+
+      - name: Parse app name
+        id: vars
+        run: |
+          REPO_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
+          APP_NAME=$(echo "$REPO_NAME" | sed 's/^M-ADP-//I' | tr '[:upper:]' '[:lower:]')
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Install yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
+      - name: Update Helm values for rollback
+        run: |
+          VALUES_PATH="values-repo/argocd/apps/values/${{ inputs.target_env }}/${{ steps.vars.outputs.app_name }}.yaml"
+
+          if [[ ! -f "$VALUES_PATH" ]]; then
+            echo "❌ ERROR: $VALUES_PATH does not exist for rollback"
+            exit 1
+          fi
+
+          yq eval -i ".image.tag = \"${{ inputs.target_image_tag }}\"" $VALUES_PATH
+
+          echo "Rollback Updated:"
+          cat $VALUES_PATH
+
+      - name: Commit and push changes
+        run: |
+          cd values-repo
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if there are changes before committing
+          if [[ -z $(git status -s) ]]; then
+            echo "⚠️ No changes detected for rollback. Skipping commit."
+            exit 0
+          fi
+
+          git add .
+          git commit -m "rollback(${{ inputs.target_env }}): revert image ${{ steps.vars.outputs.app_name }} to ${{ inputs.target_image_tag }}"
+          git push origin master
