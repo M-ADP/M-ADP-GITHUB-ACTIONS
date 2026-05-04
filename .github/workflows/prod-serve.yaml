@@ -27,29 +27,26 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      # Assumes a specific branch pattern for prod-serve, e.g., 'prod-serve-*'
-      - name: Detect branch
-        id: pr
-        run: |
-          echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-
       - name: Validate prod-serve branch and set variables
         id: vars
         run: |
-          BRANCH="${{ steps.pr.outputs.branch }}"
+          BRANCH="${{ github.ref_name }}"
 
-          if [[ ! "$BRANCH" =~ ^prod-serve-.*$ ]]; then
-            echo "Not a prod-serve-* branch. Skipping deploy."
-            exit 0
+          # Only allow prod-* branches
+          if [[ ! "$BRANCH" =~ ^prod-.*$ ]]; then
+            echo "Not a prod-* branch. Skipping deploy."
+            exit 1
           fi
 
           echo "Detected valid prod-serve branch: $BRANCH"
 
           VERSION="$BRANCH"
           REPO_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
+          APP_NAME=$(echo "$REPO_NAME" | sed 's/^M-ADP-//I' | tr '[:upper:]' '[:lower:]')
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "repo_name=$REPO_NAME" >> $GITHUB_OUTPUT
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -65,7 +62,7 @@ jobs:
 
       - name: Build and push multi-platform image
         run: |
-          IMAGE=${{ inputs.docker_owner }}/${{ steps.vars.outputs.repo_name }}
+          IMAGE=${{ inputs.docker_owner }}/${{ steps.vars.outputs.app_name }}
           TAG=${{ steps.vars.outputs.version }}
 
           docker buildx build \
@@ -90,7 +87,7 @@ jobs:
 
       - name: Update Helm values
         run: |
-          VALUES_PATH="values-repo/argocd/apps/values/prod-serve/${{ steps.vars.outputs.repo_name }}.yaml"
+          VALUES_PATH="values-repo/apps/values/prod-serve/${{ steps.vars.outputs.app_name }}.yaml"
 
           if [[ ! -f "$VALUES_PATH" ]]; then
             echo "❌ ERROR: $VALUES_PATH does not exist"
@@ -110,5 +107,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add .
-          git commit -m "prod-serve: update image ${{ steps.vars.outputs.repo_name }} to ${{ steps.vars.outputs.version }}"
+          git commit -m "prod-serve: update image ${{ steps.vars.outputs.app_name }} to ${{ steps.vars.outputs.version }}"
           git push origin master
