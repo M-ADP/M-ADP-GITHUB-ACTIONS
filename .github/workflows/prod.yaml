@@ -67,6 +67,7 @@ jobs:
 
           docker buildx build \
             --platform linux/amd64 \
+            --provenance=false \
             -t $IMAGE:$TAG \
             -t $IMAGE:latest \
             --push .
